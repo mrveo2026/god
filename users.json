@@ -1,0 +1,17 @@
+{
+    "allowed_users": {},
+    "vip_plans": {
+        "1_month": {
+            "price": 10,
+            "days": 30
+        },
+        "3_months": {
+            "price": 25,
+            "days": 90
+        },
+        "1_year": {
+            "price": 80,
+            "days": 365
+        }
+    }
+}
