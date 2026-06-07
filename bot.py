@@ -8,8 +8,8 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 # --- CONFIGURATION ---
-token = '8910582957:AAEtLRnEePDQ-xA81fOGMjyWpG8NeOzbzP0'
-ADMIN_ID = 5831292144 
+token = '8732633493:AAH9KqxUhUvbZ5Zo0qw5EcdOWhjFtpk0wq0'
+ADMIN_ID = 5831292144
 API_ID = '37536372'
 API_HASH = 'abcebb0aa8c00b3ccb4a3172b566325d'
 CHANNEL_ID = '-1003763847738' 
@@ -21,7 +21,7 @@ PREMIUM_EMOJI_IDS = {
     "🤖": "5927026418616636353", "🤵": "4949560993840629085", "💰": "5971944878815317190",
     "⏸️": "6001440193058444284", "▶️": "6285315214673975495", "🛑": "5420323339723881652",
     "📊": "6032808241891644148", "📦": "6066395745139824604", "📋": "5974235702701853774",
-    "🔄": "5971837723676249096", "⏳": "5927294695158847101", "🚀": "6235302918967269680",
+    "🔄": "5971837723676249096", "⏳": "5971837723676249096", "🚀": "6235302918967269680",
     "⚠️": "5420323339723881652", "💎": "4956739572114392015",
 }
 
@@ -98,20 +98,20 @@ def start(message):
 ➜ <code>/addvip [user_id] [days]</code> - Add VIP
 ➜ <code>/broadcast [message]</code> - Message all users
 ━━━━━━━━━━━━━━━━━━━━━━━━
-{get_emj('🌐')} <b>CHANNEL: @VEO3_2</b>
+{get_emj('🌐')} <b>CHANNEL: @Mydev1</b>
 """
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton(f"📢 CHANNEL", url="https://t.me/Veo3_free_Paid"), types.InlineKeyboardButton(f"👤 OWNER", url=f"tg://user?id={ADMIN_ID}"))
+    markup.add(types.InlineKeyboardButton(f"📢 CHANNEL", url="https://t.me/Mydev1"), types.InlineKeyboardButton(f"👤 OWNER", url=f"tg://user?id={ADMIN_ID}"))
     bot.reply_to(message, welcome_msg, reply_markup=markup)
 
 @bot.message_handler(commands=["vipplans"])
 def vipplans(message):
     users_data = load_users_data()
     plans = users_data.get('vip_plans', {})
-    text = f"{get_emj('💎')} <b>VIP SUBSCRIPTION PLANS</b> {get_emj('💎')}\n━━━━━━━━━━━━━━━━━━━━━━━\n"
+    text = f"{get_emj('💎')} <b>VIP SUBSCRIPTION PLANS</b> {get_emj('💎')}\n━━━━━━━━━━━━━━━━━━━━━━━━\n"
     for plan, info in plans.items():
         text += f"➜ <b>{plan.replace('_', ' ').title()}:</b> ${info['price']} ({info['days']} Days)\n"
-    text += "\n━━━━━━━━━━━━━━━━━━━━━━━\n {get_emj('🤵')} <b>Contact @VEO3_2 to Buy!</b>"
+    text += "\n━━━━━━━━━━━━━━━━━━━━━━━━\n{get_emj('🤵')} <b>Contact @Mydev1 to Buy!</b>"
     bot.reply_to(message, text)
 
 @bot.message_handler(commands=["addvip"])
@@ -197,7 +197,7 @@ def update_ui(message, stats):
 {get_emj('🎯')} <b>GATE:</b> <code>{last_gate}</code>
 {get_emj('📝')} <b>RESP:</b> <code>{last_resp}</code>
 <b>━━━━━━━━━━━━━━</b>
-<b>BY: @VEO3_2</b>
+<b>BY: @Mydev1</b>
 """
     try: bot.edit_message_text(chat_id=message.chat.id, message_id=stats['msg_id'], text=text, reply_markup=markup)
     except: pass
@@ -250,7 +250,7 @@ def process_cc(cc, message, stats):
 {get_emj('🎯')} <b>GATE:</b> <code>{gate_name}</code>
 {get_emj('⏳')} <b>TIME:</b> <code>{execution_time:.1f}s</code>
 <b>━━━━━━━━━━━━━━</b>
-<b>BY: @VEO3_2</b>
+<b>BY: @Mydev1</b>
 """
     if is_hit: 
         stats['ch'] += 1; bot.reply_to(message, hit_msg)
